@@ -67,6 +67,10 @@ class TestVariable:
         assert dumped["name"] == "test_var"
         assert dumped["read_only"] is True
         assert dumped["default_validation_config"] == "error"
+        assert (
+            ConcreteVariable(**dumped).model_dump()["variable_class"]
+            == "ConcreteVariable"
+        )
 
     def test_validate_value_implementation(self):
         """Test that concrete implementation works."""
