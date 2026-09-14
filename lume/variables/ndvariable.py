@@ -13,7 +13,13 @@ from typing import Any, ClassVar, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import ConfigDict, field_serializer, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    ValidationInfo,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from lume.variables.variable import ConfigEnum, Variable
 
@@ -136,7 +142,7 @@ class NDVariable(Variable):
 
     @field_validator("default_value", mode="before")
     @classmethod
-    def coerce_default_value(cls, value: Any) -> Any:
+    def coerce_default_value(cls, value: Any, info: ValidationInfo) -> Any:
         """Coerce list or tuple input to np.ndarray for round-trip deserialization.
 
         When a model is reconstructed from a serialized dict (e.g. loaded
@@ -144,11 +150,19 @@ class NDVariable(Variable):
         This validator converts it back to a NumPy array so that the model
         invariants are maintained.
 
+        The array is built using the model's own ``dtype`` (already validated,
+        since ``dtype`` is declared before ``default_value``). Without this the
+        list would default to ``float64``/``int64`` and fail the exact-dtype
+        check in ``validate_default_value`` for any other dtype.
+
         Parameters
         ----------
         value : Any
             Raw input value. If it is a list or tuple it is
             converted to np.ndarray; otherwise it is returned unchanged.
+        info : ValidationInfo
+            Pydantic validation context, used to read the already-validated
+            ``dtype`` field.
 
         Returns
         -------
@@ -157,7 +171,7 @@ class NDVariable(Variable):
 
         """
         if isinstance(value, (list, tuple)):
-            return np.asarray(value)
+            return np.asarray(value, dtype=info.data.get("dtype"))
         return value
 
     @field_validator("dtype", mode="before")
