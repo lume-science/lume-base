@@ -16,10 +16,14 @@ def isbool(x):
 
 
 def try_int(x):
-    if x == int(x):
-        return int(x)
-    else:
-        return x
+    # int() raises on non-finite floats (inf/nan) and can overflow; such values
+    # (which appear in real Fortran/Astra/Impact numeric output) are left as-is.
+    try:
+        if x == int(x):
+            return int(x)
+    except (ValueError, OverflowError):
+        pass
+    return x
 
 
 def try_bool(x):
