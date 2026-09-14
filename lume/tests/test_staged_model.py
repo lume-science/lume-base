@@ -218,7 +218,7 @@ def test_staged_model_only_updates_later_stage_when_requested() -> None:
 
     model.set({"transport_scale": 2.5})
 
-    assert beam_transport.get("transport_scale") == 2.5
+    assert beam_transport.get_value("transport_scale") == 2.5
     assert beam_source.call_count_set == source_calls_before
     assert beam_transport.call_count_set == transport_calls_before + 1
 

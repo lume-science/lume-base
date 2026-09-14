@@ -30,7 +30,7 @@ class LUMEModel(ABC):
         Reset the simulator to its initial state.
     """
 
-    def get(self, names: list[str] | str) -> dict[str, Any] | Any:
+    def get(self, names: list[str]) -> dict[str, Any]:
         """
         Get measurements/state from the simulator. Should do the following:
         - validate input names against supported_variables
@@ -38,21 +38,17 @@ class LUMEModel(ABC):
 
         Parameters
         ----------
-        names: list[str] | str
-            List of variable names or a single variable name to get from the simulator.
+        names: list[str]
+            List of variable names to get from the simulator.
 
         Returns
         -------
-        dict[str, Any] | Any
-            Dictionary of variable names and their corresponding values. If a single
-            variable name is provided, returns the value directly.
+        dict[str, Any]
+            Dictionary of variable names and their corresponding values.
 
         """
-        # Handle single variable name input and set flag to return single value instead of dict
-        return_single = False
-        if isinstance(names, str):
-            names = [names]
-            return_single = True
+        if not isinstance(names, list):
+            raise TypeError("names must be a list of strings.")
 
         # Validate input names
         for name in names:
@@ -71,7 +67,23 @@ class LUMEModel(ABC):
                     f"Validation failed for variable '{name}': {exc}"
                 ) from exc
 
-        return outputs if not return_single else outputs[names[0]]
+        return outputs
+
+    def get_value(self, name: str) -> Any:
+        """
+        Get the value of a single variable from the simulator.
+
+        Parameters
+        ----------
+        name: str
+            The name of the variable to get from the simulator.
+
+        Returns
+        -------
+        Any
+            The value of the requested variable.
+        """
+        return self.get([name])[name]
 
     @abstractmethod
     def _get(self, names: list[str]) -> dict[str, Any]:
@@ -134,6 +146,23 @@ class LUMEModel(ABC):
 
         # Set the control parameters of the simulator
         self._set(values)
+
+    def set_value(self, name: str, value: Any) -> None:
+        """
+        Set the value of a single variable in the simulator.
+
+        Parameters
+        ----------
+        name: str
+            The name of the variable to set in the simulator.
+        value: Any
+            The value to set for the specified variable.
+
+        Returns
+        -------
+        None
+        """
+        self.set({name: value})
 
     @abstractmethod
     def _set(self, values: dict[str, Any]) -> None:

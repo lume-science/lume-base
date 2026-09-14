@@ -80,7 +80,7 @@ class TestActionModel:
 
     def test_get(self, action_model):
         action_model.simulator.values["y"] = 9.9
-        assert action_model.get("y") == 9.9
+        assert action_model.get_value("y") == 9.9
 
     def test_set(self, action_model):
         action_model.set({"x": 5.0})

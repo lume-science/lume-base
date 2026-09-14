@@ -81,10 +81,25 @@ class TestLUMEModel:
         assert isinstance(variables["output_var"], ScalarVariable)
         assert isinstance(variables["control_var"], MockVariable)
 
-    def test_get_single_variable_as_string(self, model):
-        """Test that get() can accept a single variable name as a string."""
-        result = model.get("input_var")
+    def test_get_value_valid_variable(self, model):
+        """Test that get_value() returns a single variable value."""
+        result = model.get_value("input_var")
         assert result == 1.0
+
+    def test_get_value_invalid_variable(self, model):
+        """Test getting an unsupported variable with get_value() raises ValueError."""
+        with pytest.raises(ValueError, match="Variable 'invalid_var' is not supported"):
+            model.get_value("invalid_var")
+
+    def test_get_value_validation_error_includes_name(self, model):
+        """Test get_value() validation errors include the variable name."""
+        model._state["control_var"] = None
+
+        with pytest.raises(
+            ValueError,
+            match="Validation failed for variable 'control_var': Value cannot be None",
+        ):
+            model.get_value("control_var")
 
     def test_get_valid_variables(self, model):
         """Test getting valid variable values."""
@@ -141,6 +156,31 @@ class TestLUMEModel:
         model.set({"input_var": 3.5})
         result = model.get(["input_var"])
         assert result["input_var"] == 3.5
+
+    def test_set_value_valid_variable(self, model):
+        """Test that set_value() sets a single variable value."""
+        model.set_value("input_var", 3.5)
+
+        assert model.get_value("input_var") == 3.5
+        assert model.get_value("output_var") == 7.0
+
+    def test_set_value_invalid_variable(self, model):
+        """Test setting an unsupported variable with set_value() raises ValueError."""
+        with pytest.raises(ValueError, match="Variable 'invalid_var' is not supported"):
+            model.set_value("invalid_var", 123)
+
+    def test_set_value_read_only_variable(self, model):
+        """Test setting a read-only variable with set_value() raises ReadOnlyError."""
+        with pytest.raises(ReadOnlyError, match="Variable 'output_var' is read-only"):
+            model.set_value("output_var", 100.0)
+
+    def test_set_value_validation_error_includes_name(self, model):
+        """Test set_value() validation errors include the variable name."""
+        with pytest.raises(
+            ValueError,
+            match="Validation failed for variable 'control_var': Value cannot be None",
+        ):
+            model.set_value("control_var", None)
 
     def test_set_invalid_variable(self, model):
         """Test setting an unsupported variable raises ValueError."""
