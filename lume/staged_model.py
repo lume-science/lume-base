@@ -57,10 +57,10 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     def coerce_evaluated_once(self) -> None:
         """Run the model at least once if it hasn't been run already."""
         if not self._is_init:
-            self.refresh()
+            self.run_start_to_end()
             self._is_init = True
 
-    def refresh(self) -> None:
+    def run_start_to_end(self) -> None:
         """Run a single start-to-end propagation across all staged models."""
 
         incoming_particles = None
