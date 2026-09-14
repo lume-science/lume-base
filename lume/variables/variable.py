@@ -27,6 +27,8 @@ class Variable(BaseModel, ABC):
     ----------
     name : str
         Name of the variable.
+    description : str
+        Description of the variable.
     read_only : bool
         Flag indicating whether the variable can be set.
     default_validation_config : ConfigEnum
@@ -40,6 +42,7 @@ class Variable(BaseModel, ABC):
     model_config = ConfigDict(use_enum_values=True)
 
     name: str
+    description: str = ""
     read_only: bool = False
     default_validation_config: ConfigEnum = "none"
 
