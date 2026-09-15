@@ -77,10 +77,10 @@ class HDF5Serializer(SerializerBase):
             except ImportError:
                 raise ModuleImportError(package_str, package_version)
 
-            object_type = getattr(object_import_module, object_name)
+            object_type = getattr(object_import_module, object_name, None)
 
-            if not object_type:
-                raise ClassInitError(object_name, object_import_module, package_version)
+            if object_type is None:
+                raise ClassInitError(object_name, package_str, package_version)
 
             object = object_type()
             object.load_archive(f)
