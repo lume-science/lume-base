@@ -54,6 +54,15 @@ class HDF5Serializer(SerializerBase):
     def deserialize(cls, filename: str) -> "Base":
         """Deserialize hdf5 file and load described object.
 
+        .. warning::
+
+            Deserialization imports the module and instantiates the class named
+            in the file's ``object`` attribute. Only load archives from trusted
+            sources: a maliciously crafted file can name an arbitrary importable
+            module, whose import-time side effects will execute. As a safeguard
+            the resolved object must be a class exposing a ``load_archive``
+            method; anything else is rejected before it is instantiated.
+
         Args:
             filename (str): Name of file to load.
 
@@ -66,7 +75,14 @@ class HDF5Serializer(SerializerBase):
             # Because we've stored things like version, object, and package version, we can do integrity checks
             cls._check_compat(f.attrs.get("_version"))
 
-            object_import_split = f.attrs.get("object").split(".")
+            object_attr = f.attrs.get("object")
+            if not object_attr or "." not in object_attr:
+                raise ValueError(
+                    "Archive is missing a valid 'object' attribute "
+                    f"(got {object_attr!r})."
+                )
+
+            object_import_split = object_attr.split(".")
             package_str = ".".join(object_import_split[:-1])
             object_name = object_import_split[-1]
             package_version = f.attrs.get("_pkg_version")
@@ -77,10 +93,20 @@ class HDF5Serializer(SerializerBase):
             except ImportError:
                 raise ModuleImportError(package_str, package_version)
 
-            object_type = getattr(object_import_module, object_name)
+            object_type = getattr(object_import_module, object_name, None)
 
-            if not object_type:
-                raise ClassInitError(object_name, object_import_module, package_version)
+            if object_type is None:
+                raise ClassInitError(object_name, package_str, package_version)
+
+            # Refuse to instantiate anything that is not a class exposing the
+            # serialization interface (a callable ``load_archive``). This blocks
+            # the "instantiate an arbitrary class and call load_archive on it"
+            # gadget that an untrusted archive could otherwise trigger.
+            if not (
+                isinstance(object_type, type)
+                and callable(getattr(object_type, "load_archive", None))
+            ):
+                raise ClassInitError(object_name, package_str, package_version)
 
             object = object_type()
             object.load_archive(f)

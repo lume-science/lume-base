@@ -122,11 +122,14 @@ def find_executable(exename=None, envname=None):
     if not exename and not envname:
         raise ValueError("No exename or envname ")
 
-    # Start searching
+    # Start searching. Search PATH before the current working directory so a
+    # binary planted in the cwd cannot shadow a trusted executable found on PATH
+    # (CWE-426, untrusted search path).
     search_path = []
-    # search_path.append(os.environ.get(envname))
+    path_env = os.environ.get("PATH")
+    if path_env:
+        search_path.append(path_env)
     search_path.append(os.getcwd())
-    search_path.append(os.environ.get("PATH"))
     search_path_str = os.pathsep.join(search_path)
     bin_location = shutil.which(exename, path=search_path_str)
 
