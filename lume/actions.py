@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union
 
 from pydantic import field_validator
 
@@ -94,6 +94,52 @@ class WritableActionMixin(Action[SimulatorT], Generic[SimulatorT]):
             The value to assign to this variable in the simulator.
         """
         ...
+
+
+class AffineTransformMixin(Action[SimulatorT], Generic[SimulatorT]):
+    """
+    Mixin for variable-actions that apply an affine transformation to the value on set 
+    and undo the transformation on get. Defaults to the identity transformation (scale=1, offset=0).
+
+    Mix into a ``Action`` subclass.
+    """
+    scale: Optional[float] = 1.0
+    offset: Optional[float] = 0.0
+
+    def _get(self, simulator: SimulatorT) -> Any:
+        """Return the current value from ``simulator`` after undoing the affine transformation.
+
+        Parameters
+        ----------
+        simulator : SimulatorT
+            The simulator to read from.
+
+        Returns
+        -------
+        Any
+            The current value of this variable in the simulator after undoing the affine transformation.
+        """
+        raw_value = super()._get(simulator)
+        return (raw_value - self.offset) / self.scale
+    
+    def _set(self, simulator: SimulatorT, value: Any) -> None:
+        """Write ``value`` to ``simulator`` after applying the affine transformation.
+
+        Parameters
+        ----------
+        simulator : SimulatorT
+            The simulator to write to.
+        value : Any
+            The value to assign to this variable in the simulator after applying the affine transformation.
+        """
+        transformed_value = value * self.scale + self.offset
+
+        try:
+            super()._set(simulator, transformed_value)
+        except AttributeError:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} does not implement _set, cannot apply affine transformation"
+            )
 
 
 ###############################################################################
