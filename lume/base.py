@@ -217,15 +217,16 @@ class Base(ABC):
         if os.path.exists(tools.full_path(yaml_file)):
             yaml_file = tools.full_path(yaml_file)
             config = yaml.safe_load(open(yaml_file))
+            # Relative paths in the config are resolved against the YAML file's
+            # directory.
+            config_dir, _ = os.path.split(yaml_file)
 
             if "input_file" in config:
                 # Check that the input file is absolute path...
                 # require absolute/ relative to working dir for model input file
                 f = os.path.expandvars(config["input_file"])
                 if not os.path.isabs(f):
-                    # Get the yaml file root
-                    root, _ = os.path.split(tools.full_path(yaml_file))
-                    config["input_file"] = os.path.join(root, f)
+                    config["input_file"] = os.path.join(config_dir, f)
 
                 # Here, we update the config with the input_file contents
                 # provided that the input_parser method has been implemented on the subclass
@@ -234,8 +235,10 @@ class Base(ABC):
                     config.update(parsed_input)
 
         else:
-            # Try raw string
+            # Try raw string. There is no source file, so relative paths are
+            # resolved against the current working directory.
             config = yaml.safe_load(yaml_file)
+            config_dir = os.getcwd()
             if parse_input and "input_file" in config:
                 parsed_input = cls.input_parser(config["input_file"])
                 config.update(parsed_input)
@@ -244,8 +247,7 @@ class Base(ABC):
         if "initial_particles" in config:
             f = config["initial_particles"]
             if not os.path.isabs(f):
-                root, _ = os.path.split(tools.full_path(yaml_file))
-                f = os.path.join(root, f)
+                f = os.path.join(config_dir, f)
             config["initial_particles"] = ParticleGroup(f)
 
         return cls(**config)
