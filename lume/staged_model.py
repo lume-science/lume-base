@@ -1,9 +1,12 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any
 
+import numpy as np
 from beamphysics import ParticleGroup
 
 from lume.model import LUMEModel
+from lume.variables.ndvariable import NDVariable
 from lume.variables.variable import Variable
 
 
@@ -96,26 +99,105 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         seen: dict[str, int] = {}
         for i, model in enumerate(models):
             for name in model.supported_variables:
+                # skip shared pmd: variables that are allowed to be in multiple models
+                if name.startswith("pmd:"):
+                    continue
+
                 if name in seen:
                     raise ValueError(
                         f"Variable '{name}' is defined in both model {seen[name]} and model {i}."
                     )
                 seen[name] = i
 
+        # trigger pmd: validation eagerly so problems are warned about at construction
+        cls._combined_pmd_variables(models)
+
+    @staticmethod
+    def _combined_pmd_variables(models: list[LUMEModel]) -> dict[str, NDVariable]:
+        """
+        Build read-only NDVariables representing pmd: outputs, concatenated
+        along axis 0 across all models that support a given name. A pmd: name
+        that isn't supported by every model as a compatible NDVariable is
+        excluded from the result and a warning is issued (once per unique
+        message, per the default warnings filter) rather than raising.
+
+        Parameters
+        ----------
+        models: list[LUMEModel]
+            Models to inspect for pmd: variables.
+        """
+        pmd_names: set[str] = set()
+        for model in models:
+            pmd_names.update(
+                name for name in model.supported_variables if name.startswith("pmd:")
+            )
+
+        combined: dict[str, NDVariable] = {}
+        for name in pmd_names:
+            if not all(name in model.supported_variables for model in models):
+                warnings.warn(
+                    f"pmd: variable '{name}' is not supported by all staged "
+                    "models; excluding it from supported_variables.",
+                    stacklevel=2,
+                )
+                continue
+
+            stage_vars = [model.supported_variables[name] for model in models]
+
+            if not all(isinstance(var, NDVariable) for var in stage_vars):
+                warnings.warn(
+                    f"pmd: variable '{name}' must be an NDVariable on every "
+                    "model; excluding it from supported_variables.",
+                    stacklevel=2,
+                )
+                continue
+
+            tail_shape = stage_vars[0].shape[1:]
+            if any(var.shape[1:] != tail_shape for var in stage_vars[1:]):
+                warnings.warn(
+                    f"pmd: variable '{name}' has incompatible shapes across "
+                    "staged models; excluding it from supported_variables.",
+                    stacklevel=2,
+                )
+                continue
+
+            combined_shape = (sum(var.shape[0] for var in stage_vars), *tail_shape)
+            combined[name] = NDVariable(
+                name=name, shape=combined_shape, dtype=np.float64, read_only=True
+            )
+
+        return combined
+
     @property
     def supported_variables(self) -> dict[str, Variable]:
-        return {
+        variables = {
             name: var
             for model in self.lume_model_instances
             for name, var in model.supported_variables.items()
+            if not name.startswith("pmd:")
         }
+        variables.update(self._combined_pmd_variables(self.lume_model_instances))
+        return variables
 
     def _get(self, names: list[str]) -> dict[str, Any]:
         self.coerce_evaluated_once()
 
         values = {}
+
+        # concatenate pmd: variable values across all stages, in stage order
+        for name in names:
+            if name.startswith("pmd:"):
+                arrays = [
+                    model.get([name])[name] for model in self.lume_model_instances
+                ]
+                values[name] = np.concatenate(arrays, axis=0).astype(np.float64)
+
         for model in self.lume_model_instances:
-            model_names = [n for n in names if n in model.supported_variables]
+            model_names = [
+                n
+                for n in names
+                if n in model.supported_variables and not n.startswith("pmd:")
+            ]
             if model_names:
                 values.update(model.get(model_names))
         return values
