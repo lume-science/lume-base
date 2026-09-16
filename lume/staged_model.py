@@ -49,6 +49,11 @@ def _canonical_pmd_class(var: PMDVariable) -> type[PMDVariable]:
     return type(var)
 
 
+def _model_label(index: int, model: LUMEModel) -> str:
+    """Identify a staged model in warning messages by index and class name."""
+    return f"model {index} ({type(model).__name__})"
+
+
 class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     """
     Composes multiple LUMEModel instances in sequence, passing final particles
@@ -153,32 +158,48 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         combined: dict[str, NDVariable] = {}
         for name in pmd_names:
-            if not all(name in model.supported_variables for model in models):
+            missing = [
+                _model_label(i, model)
+                for i, model in enumerate(models)
+                if name not in model.supported_variables
+            ]
+            if missing:
                 warnings.warn(
-                    f"pmd: variable '{name}' is not supported by all staged "
-                    "models; excluding it from supported_variables.",
+                    f"pmd: variable '{name}' is not supported by "
+                    f"{', '.join(missing)}; excluding it from "
+                    "supported_variables.",
                     stacklevel=2,
                 )
                 continue
 
             stage_vars = [model.supported_variables[name] for model in models]
 
-            if not all(isinstance(var, PMDVariable) for var in stage_vars):
+            not_pmd = [
+                _model_label(i, model)
+                for i, (model, var) in enumerate(zip(models, stage_vars))
+                if not isinstance(var, PMDVariable)
+            ]
+            if not_pmd:
                 warnings.warn(
-                    f"pmd: variable '{name}' must be a PMDVariable on every "
-                    "model; excluding it from supported_variables.",
+                    f"pmd: variable '{name}' is not a PMDVariable on "
+                    f"{', '.join(not_pmd)}; excluding it from "
+                    "supported_variables.",
                     stacklevel=2,
                 )
                 continue
 
             first_type = _canonical_pmd_class(stage_vars[0])
-            if not all(
-                _canonical_pmd_class(var) is first_type for var in stage_vars[1:]
-            ):
+            mismatched = [
+                _model_label(i, model)
+                for i, (model, var) in enumerate(zip(models, stage_vars))
+                if _canonical_pmd_class(var) is not first_type
+            ]
+            if mismatched:
                 warnings.warn(
-                    f"pmd: variable '{name}' must use the same canonical "
-                    "PMDVariable class (i.e. share the same pmd: name/unit "
-                    "contract) on every model; excluding it from "
+                    f"pmd: variable '{name}' uses a different canonical "
+                    f"PMDVariable class (i.e. a different pmd: name/unit "
+                    f"contract) on {', '.join(mismatched)} than "
+                    f"{_model_label(0, models[0])}; excluding it from "
                     "supported_variables.",
                     stacklevel=2,
                 )

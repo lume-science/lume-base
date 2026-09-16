@@ -393,7 +393,9 @@ def test_staged_model_pmd_variable_partial_support_excluded() -> None:
     )
     beam_transport = BeamTransportTestModel()  # does not support pmd:beta_x
 
-    with pytest.warns(UserWarning, match="not supported by all staged models"):
+    with pytest.warns(
+        UserWarning, match=r"not supported by model 1 \(BeamTransportTestModel\)"
+    ):
         model = StagedModel([beam_source, beam_transport])
 
     assert "pmd:beta_x" not in model.supported_variables
@@ -415,7 +417,9 @@ def test_staged_model_pmd_variable_wrong_type_excluded_with_warning() -> None:
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
 
-    with pytest.warns(UserWarning, match="must be a PMDVariable"):
+    with pytest.warns(
+        UserWarning, match=r"not a PMDVariable on model 0 \(BeamSourceTestModel\)"
+    ):
         model = StagedModel([beam_source, beam_transport])
 
     assert "pmd:beta_x" not in model.supported_variables
@@ -433,7 +437,10 @@ def test_staged_model_pmd_variable_different_subclass_excluded_with_warning() ->
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
 
-    with pytest.warns(UserWarning, match="same canonical PMDVariable class"):
+    with pytest.warns(
+        UserWarning,
+        match=r"model 1 \(BeamTransportTestModel\) than model 0 \(BeamSourceTestModel\)",
+    ):
         model = StagedModel([beam_source, beam_transport])
 
     assert "pmd:beta_x" not in model.supported_variables
