@@ -439,22 +439,6 @@ def test_staged_model_pmd_variable_different_subclass_excluded_with_warning() ->
     assert "pmd:beta_x" not in model.supported_variables
 
 
-def test_staged_model_pmd_variable_shape_mismatch_excluded_with_warning() -> None:
-    beam_source = BeamSourceTestModel(
-        pmd_variables={"pmd:orbit": _pmd_variable("pmd:orbit", (2,))},
-        pmd_values={"pmd:orbit": np.array([1.0, 2.0])},
-    )
-    beam_transport = BeamTransportTestModel(
-        pmd_variables={"pmd:orbit": _pmd_variable("pmd:orbit", (3, 2))},
-        pmd_values={"pmd:orbit": np.zeros((3, 2))},
-    )
-
-    with pytest.warns(UserWarning, match="incompatible shapes"):
-        model = StagedModel([beam_source, beam_transport])
-
-    assert "pmd:orbit" not in model.supported_variables
-
-
 def test_staged_model_pmd_variable_set_raises_read_only() -> None:
     from lume.exceptions import ReadOnlyError
 

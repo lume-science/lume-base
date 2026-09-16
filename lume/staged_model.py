@@ -165,16 +165,8 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 )
                 continue
 
-            tail_shape = stage_vars[0].shape[1:]
-            if any(var.shape[1:] != tail_shape for var in stage_vars[1:]):
-                warnings.warn(
-                    f"pmd: variable '{name}' has incompatible shapes across "
-                    "staged models; excluding it from supported_variables.",
-                    stacklevel=2,
-                )
-                continue
-
-            combined_shape = (sum(var.shape[0] for var in stage_vars), *tail_shape)
+            # PMDVariable enforces 1D shapes, so only the leading (concatenated) dimension can vary.
+            combined_shape = (sum(var.shape[0] for var in stage_vars),)
             combined[name] = first_type(
                 name=name,
                 shape=combined_shape,

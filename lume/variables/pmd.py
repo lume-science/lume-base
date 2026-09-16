@@ -19,6 +19,13 @@ class PMDVariable(NDVariable, ReadOnlyActionMixin):
             raise ValueError("Name must start with 'pmd'")
         return value
 
+    @field_validator("shape")
+    def validate_shape(cls, value):
+        # make sure that the shape is 1D
+        if len(value) != 1:
+            raise ValueError("Shape must be 1D")
+        return value
+
 
 # Registry of canonical pmd: variable name -> generated PMDVariable subclass,
 # used to look up the expected unit for a given pmd: variable name.
