@@ -367,11 +367,11 @@ def _pmd_variable(
 def test_staged_model_pmd_variable_registered_and_concatenated() -> None:
     beam_source = BeamSourceTestModel(
         pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
-        pmd_values={"pmd:beta_x": np.array([1.0])},
+        pmd_values={"pmd:beta_x": np.array([1.0], dtype=np.float32)},
     )
     beam_transport = BeamTransportTestModel(
         pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
-        pmd_values={"pmd:beta_x": np.array([2.0])},
+        pmd_values={"pmd:beta_x": np.array([2.0], dtype=np.float32)},
     )
     model = StagedModel([beam_source, beam_transport])
 
@@ -428,9 +428,7 @@ def test_staged_model_pmd_variable_different_subclass_excluded_with_warning() ->
     )
     beam_transport = BeamTransportTestModel(
         pmd_variables={
-            "pmd:beta_x": _pmd_variable(
-                "pmd:beta_x", (1,), cls=_OtherTestPMDVariable
-            )
+            "pmd:beta_x": _pmd_variable("pmd:beta_x", (1,), cls=_OtherTestPMDVariable)
         },
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
