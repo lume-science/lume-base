@@ -386,6 +386,32 @@ def test_staged_model_pmd_variable_registered_and_concatenated() -> None:
     assert np.allclose(values, [1.0, 2.0])
 
 
+def test_staged_model_pmd_model_index_variable() -> None:
+    beam_source = BeamSourceTestModel(
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (2,))},
+        pmd_values={"pmd:beta_x": np.array([1.0, 2.0], dtype=np.float32)},
+    )
+    beam_transport = BeamTransportTestModel(
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (3,))},
+        pmd_values={"pmd:beta_x": np.array([3.0, 4.0, 5.0], dtype=np.float32)},
+    )
+    model = StagedModel([beam_source, beam_transport])
+
+    assert "pmd:model_index" in model.supported_variables
+    combined = model.supported_variables["pmd:model_index"]
+    assert combined.shape == (5,)
+    assert combined.dtype == np.int64
+    assert combined.read_only is True
+
+    model_index = model.get(["pmd:model_index"])["pmd:model_index"]
+    assert np.array_equal(model_index, [0, 0, 1, 1, 1])
+
+
+def test_staged_model_no_pmd_model_index_when_no_pmd_variables() -> None:
+    model = StagedModel([BeamSourceTestModel(), BeamTransportTestModel()])
+    assert "pmd:model_index" not in model.supported_variables
+
+
 def test_staged_model_pmd_variable_partial_support_excluded() -> None:
     beam_source = BeamSourceTestModel(
         pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},

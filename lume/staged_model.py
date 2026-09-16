@@ -7,7 +7,7 @@ from beamphysics import ParticleGroup
 
 from lume.model import LUMEModel
 from lume.variables.ndvariable import NDVariable
-from lume.variables.pmd import PMDVariable
+from lume.variables.pmd import PMDVariable, PMDmodel_index
 from lume.variables.variable import Variable
 
 
@@ -145,6 +145,11 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         warning is issued (once per unique message, per the default warnings
         filter) rather than raising.
 
+        If any pmd: variable is successfully combined, also adds
+        "pmd:model_index": a `PMDmodel_index` (int64) of the same combined
+        length whose values give, for each entry of the concatenated pmd: arrays, the
+        index (into `models`) of the staged model that produced it.
+
         Parameters
         ----------
         models: list[LUMEModel]
@@ -211,6 +216,22 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 update={"shape": combined_shape},
             )
 
+        if combined:
+            # All combined pmd: names share the same per-model lengths (they're
+            # all "per z-step" outputs of the same staged models), so any one
+            # of them can be used to build the model-index mapping.
+            reference_name = next(iter(combined))
+            lengths = [
+                model.supported_variables[reference_name].shape[0] for model in models
+            ]
+            model_index = np.concatenate(
+                [np.full(length, i, dtype=np.int64) for i, length in enumerate(lengths)]
+            )
+            combined["pmd:model_index"] = PMDmodel_index(
+                shape=(sum(lengths),),
+                default_value=model_index,
+            )
+
         return combined
 
     @property
@@ -231,7 +252,10 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         # concatenate pmd: variable values across all stages, in stage order
         for name in names:
-            if name.startswith("pmd:"):
+            if name == "pmd:model_index":
+                # synthetic, computed once from declared shapes; not fetched from any model
+                values[name] = self.supported_variables[name].default_value
+            elif name.startswith("pmd:"):
                 arrays = [
                     model.get([name])[name] for model in self.lume_model_instances
                 ]

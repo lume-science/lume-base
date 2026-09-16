@@ -5,7 +5,12 @@ from typing import Any
 import numpy as np
 import pytest
 
-from lume.variables.pmd import PMDVariable, PMDbeta_x, create_pmd_variable
+from lume.variables.pmd import (
+    PMDVariable,
+    PMDbeta_x,
+    PMDmodel_index,
+    create_pmd_variable,
+)
 
 
 class _ConcretePMDVariable(PMDVariable):
@@ -89,3 +94,22 @@ class TestCreatePMDVariable:
 
         with pytest.raises(ValueError, match="Shape must be 1D"):
             _ConcreteGenerated(shape=(2, 2), read_only=True)
+
+
+class TestPMDmodel_index:
+    """Tests for the PMDmodel_index class."""
+
+    def test_name_and_unit_are_fixed(self):
+        assert PMDmodel_index.model_fields["name"].default == "pmd:model_index"
+        assert PMDmodel_index.model_fields["unit"].default == ""
+
+    def test_dtype_is_int64(self):
+        var = PMDmodel_index(
+            shape=(3,), default_value=np.array([0, 0, 1], dtype=np.int64)
+        )
+        assert var.dtype == np.dtype(np.int64)
+
+    def test_is_read_only_pmd_variable(self):
+        var = PMDmodel_index(shape=(3,))
+        assert isinstance(var, PMDVariable)
+        assert var.read_only is True

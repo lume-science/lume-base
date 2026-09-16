@@ -1,6 +1,6 @@
 """Set of common action base classes for OpenPMD Beamphysics variables."""
 
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from pydantic import field_validator
@@ -149,3 +149,18 @@ PMDs = create_pmd_variable(
     "m",
     "Read-only variable for the longitudinal beam position s.",
 )
+
+
+class PMDmodel_index(PMDVariable):
+    """Identifies, for each entry of a combined pmd: array, which staged model produced it."""
+
+    name: Literal["pmd:model_index"] = "pmd:model_index"
+    unit: Literal[""] = ""
+    read_only: Literal[True] = True
+    dtype: np.dtype = np.dtype(np.int64)
+
+    def _get(self, simulator: Any) -> Any:
+        raise NotImplementedError(
+            "pmd:model_index is computed directly by StagedModel, not fetched "
+            "from a simulator."
+        )
