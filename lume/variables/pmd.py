@@ -1,4 +1,6 @@
-"""Set of common action classes for OpenPMD Beamphysics variables."""
+"""Set of common action base classes for OpenPMD Beamphysics variables."""
+
+from typing import Literal
 
 import numpy as np
 from pydantic import field_validator
@@ -15,8 +17,8 @@ class PMDVariable(NDVariable, ReadOnlyActionMixin):
 
     @field_validator("name")
     def validate_name(cls, value):
-        if not value.startswith("pmd"):
-            raise ValueError("Name must start with 'pmd'")
+        if not value.startswith("pmd:"):
+            raise ValueError("Name must start with 'pmd:'")
         return value
 
     @field_validator("shape")
@@ -37,12 +39,16 @@ def create_pmd_variable(
 ) -> type[PMDVariable]:
     """Create a `PMDVariable` subclass with a fixed name and unit.
 
+    The ``name``, ``unit``, and ``read_only`` fields are constrained with
+    `Literal` annotations so instances cannot be constructed with different
+    values.
+
     Parameters
     ----------
     class_name : str
         Name of the generated class.
     name : str
-        Fixed value of the ``name`` field (must start with ``"pmd"``).
+        Fixed value of the ``name`` field (must start with ``"pmd:"``).
     unit : str
         Fixed value of the ``unit`` field.
     description : str
@@ -52,7 +58,11 @@ def create_pmd_variable(
         class_name,
         (PMDVariable,),
         {
-            "__annotations__": {"name": str, "unit": str, "read_only": bool},
+            "__annotations__": {
+                "name": Literal[name],
+                "unit": Literal[unit],
+                "read_only": Literal[True],
+            },
             "name": name,
             "unit": unit,
             "read_only": True,
@@ -86,7 +96,7 @@ PMDbeta_x = create_pmd_variable(
     "Read-only variable for the horizontal beta function in OpenPMD Beamphysics units.",
 )
 
-PMDDbeta_y = create_pmd_variable(
+PMDbeta_y = create_pmd_variable(
     "PMDbeta_y",
     "pmd:beta_y",
     "m",
@@ -110,14 +120,14 @@ PMDalpha_y = create_pmd_variable(
 PMDnorm_emit_x = create_pmd_variable(
     "PMDnorm_emit_x",
     "pmd:norm_emit_x",
-    "mm.mrad",
+    "m",
     "Read-only variable for the horizontal normalized emittance in OpenPMD Beamphysics units.",
 )
 
 PMDnorm_emit_y = create_pmd_variable(
     "PMDnorm_emit_y",
     "pmd:norm_emit_y",
-    "mm.mrad",
+    "m",
     "Read-only variable for the vertical normalized emittance in OpenPMD Beamphysics units.",
 )
 

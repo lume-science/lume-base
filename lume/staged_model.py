@@ -167,11 +167,8 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
             # PMDVariable enforces 1D shapes, so only the leading (concatenated) dimension can vary.
             combined_shape = (sum(var.shape[0] for var in stage_vars),)
-            combined[name] = first_type(
-                name=name,
-                shape=combined_shape,
-                unit=stage_vars[0].unit,
-                read_only=True,
+            combined[name] = stage_vars[0].model_copy(
+                update={"shape": combined_shape},
             )
 
         return combined

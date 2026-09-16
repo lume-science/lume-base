@@ -30,8 +30,8 @@ class TestPMDVariable:
         assert var.dtype == np.dtype(np.float32)
 
     def test_name_must_start_with_pmd(self):
-        """Names not starting with 'pmd' are rejected."""
-        with pytest.raises(ValueError, match="Name must start with 'pmd'"):
+        """Names not starting with 'pmd:' are rejected."""
+        with pytest.raises(ValueError, match="Name must start with 'pmd:'"):
             _ConcretePMDVariable(name="beta_x", shape=(1,), read_only=True)
 
     def test_shape_must_be_1d(self):
@@ -59,6 +59,36 @@ class TestCreatePMDVariable:
 
     def test_unknown_name_returns_none(self):
         assert get_pmd_variable_class("pmd:not_a_real_variable") is None
+
+    def test_name_cannot_be_overridden(self):
+        """The generated class's name is fixed, not just a default."""
+
+        class _ConcretePMDbeta_x(PMDbeta_x):
+            def _get(self, simulator: Any) -> Any:
+                raise NotImplementedError
+
+        with pytest.raises(ValueError):
+            _ConcretePMDbeta_x(name="pmd:something_else", shape=(1,), read_only=True)
+
+    def test_unit_cannot_be_overridden(self):
+        """The generated class's unit is fixed, not just a default."""
+
+        class _ConcretePMDbeta_x(PMDbeta_x):
+            def _get(self, simulator: Any) -> Any:
+                raise NotImplementedError
+
+        with pytest.raises(ValueError):
+            _ConcretePMDbeta_x(unit="mm", shape=(1,), read_only=True)
+
+    def test_read_only_cannot_be_overridden(self):
+        """The generated class's read_only is fixed to True."""
+
+        class _ConcretePMDbeta_x(PMDbeta_x):
+            def _get(self, simulator: Any) -> Any:
+                raise NotImplementedError
+
+        with pytest.raises(ValueError):
+            _ConcretePMDbeta_x(shape=(1,), read_only=False)
 
     def test_generated_class_rejects_non_1d_shape(self):
         """Generated subclasses inherit the 1D shape validator."""
