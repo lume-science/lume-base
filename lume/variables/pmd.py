@@ -29,11 +29,6 @@ class PMDVariable(NDVariable, ReadOnlyActionMixin):
         return value
 
 
-# Registry of canonical pmd: variable name -> generated PMDVariable subclass,
-# used to look up the expected unit for a given pmd: variable name.
-PMD_VARIABLE_REGISTRY: dict[str, type[PMDVariable]] = {}
-
-
 def create_pmd_variable(
     class_name: str, name: str, unit: str, description: str
 ) -> type[PMDVariable]:
@@ -54,7 +49,7 @@ def create_pmd_variable(
     description : str
         Docstring describing the variable.
     """
-    cls = type(
+    return type(
         class_name,
         (PMDVariable,),
         {
@@ -69,24 +64,6 @@ def create_pmd_variable(
             "__doc__": description,
         },
     )
-    PMD_VARIABLE_REGISTRY[name] = cls
-    return cls
-
-
-def get_pmd_variable_class(name: str) -> type[PMDVariable] | None:
-    """Look up the canonical `PMDVariable` subclass for a pmd: variable name.
-
-    Parameters
-    ----------
-    name : str
-        The pmd: variable name to look up.
-
-    Returns
-    -------
-    type[PMDVariable] | None
-        The registered subclass, or `None` if `name` isn't a known pmd: variable.
-    """
-    return PMD_VARIABLE_REGISTRY.get(name)
 
 
 PMDbeta_x = create_pmd_variable(

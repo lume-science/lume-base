@@ -1,17 +1,11 @@
-"""Tests for PMDVariable and the pmd: variable factory/registry."""
+"""Tests for PMDVariable and the pmd: variable factory."""
 
 from typing import Any
 
 import numpy as np
 import pytest
 
-from lume.variables.pmd import (
-    PMD_VARIABLE_REGISTRY,
-    PMDVariable,
-    PMDbeta_x,
-    create_pmd_variable,
-    get_pmd_variable_class,
-)
+from lume.variables.pmd import PMDVariable, PMDbeta_x, create_pmd_variable
 
 
 class _ConcretePMDVariable(PMDVariable):
@@ -46,19 +40,12 @@ class TestPMDVariable:
 
 
 class TestCreatePMDVariable:
-    """Tests for create_pmd_variable and the PMD_VARIABLE_REGISTRY."""
+    """Tests for create_pmd_variable."""
 
     def test_creates_subclass_with_fixed_name_and_unit(self):
         assert PMDbeta_x.model_fields["name"].default == "pmd:beta_x"
         assert PMDbeta_x.model_fields["unit"].default == "m"
         assert issubclass(PMDbeta_x, PMDVariable)
-
-    def test_registers_class_by_name(self):
-        assert PMD_VARIABLE_REGISTRY["pmd:beta_x"] is PMDbeta_x
-        assert get_pmd_variable_class("pmd:beta_x") is PMDbeta_x
-
-    def test_unknown_name_returns_none(self):
-        assert get_pmd_variable_class("pmd:not_a_real_variable") is None
 
     def test_name_cannot_be_overridden(self):
         """The generated class's name is fixed, not just a default."""
