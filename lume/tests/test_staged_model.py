@@ -10,7 +10,8 @@ except ImportError:
 
 from lume.model import LUMEModel
 from lume.staged_model import FinalParticlesMixIn, InitialParticlesMixIn, StagedModel
-from lume.variables import NDVariable, ScalarVariable, Variable
+from lume.variables import ScalarVariable, Variable
+from lume.variables.pmd import PMDVariable
 
 
 def make_test_particle_group(
@@ -340,35 +341,54 @@ def test_staged_model_raises_when_last_model_lacks_final_particles() -> None:
         _ = model.final_particles
 
 
-def _pmd_ndvariable(name: str, shape: tuple[int, ...]) -> NDVariable:
-    return NDVariable(name=name, shape=shape, dtype=np.float64, read_only=True)
+class _TestPMDVariable(PMDVariable):
+    """Concrete PMDVariable subclass for use as a stage's pmd: variable in tests."""
+
+    def _get(self, simulator: Any) -> Any:
+        raise NotImplementedError
+
+
+class _OtherTestPMDVariable(PMDVariable):
+    """A second, distinct PMDVariable subclass used to test subclass-mismatch validation."""
+
+    def _get(self, simulator: Any) -> Any:
+        raise NotImplementedError
+
+
+def _pmd_variable(
+    name: str,
+    shape: tuple[int, ...],
+    unit: str | None = None,
+    cls: type[PMDVariable] = _TestPMDVariable,
+) -> PMDVariable:
+    return cls(name=name, shape=shape, unit=unit, read_only=True)
 
 
 def test_staged_model_pmd_variable_registered_and_concatenated() -> None:
     beam_source = BeamSourceTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([1.0])},
     )
     beam_transport = BeamTransportTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
     model = StagedModel([beam_source, beam_transport])
 
     combined = model.supported_variables["pmd:beta_x"]
-    assert isinstance(combined, NDVariable)
+    assert isinstance(combined, _TestPMDVariable)
     assert combined.shape == (2,)
     assert combined.read_only is True
 
     values = model.get(["pmd:beta_x"])["pmd:beta_x"]
     assert isinstance(values, np.ndarray)
-    assert values.dtype == np.float64
+    assert values.dtype == np.float32
     assert np.allclose(values, [1.0, 2.0])
 
 
 def test_staged_model_pmd_variable_partial_support_excluded() -> None:
     beam_source = BeamSourceTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([1.0])},
     )
     beam_transport = BeamTransportTestModel()  # does not support pmd:beta_x
@@ -391,11 +411,31 @@ def test_staged_model_pmd_variable_wrong_type_excluded_with_warning() -> None:
         pmd_values={"pmd:beta_x": 1.0},
     )
     beam_transport = BeamTransportTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
 
-    with pytest.warns(UserWarning, match="must be an NDVariable"):
+    with pytest.warns(UserWarning, match="must be a PMDVariable"):
+        model = StagedModel([beam_source, beam_transport])
+
+    assert "pmd:beta_x" not in model.supported_variables
+
+
+def test_staged_model_pmd_variable_different_subclass_excluded_with_warning() -> None:
+    beam_source = BeamSourceTestModel(
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
+        pmd_values={"pmd:beta_x": np.array([1.0])},
+    )
+    beam_transport = BeamTransportTestModel(
+        pmd_variables={
+            "pmd:beta_x": _pmd_variable(
+                "pmd:beta_x", (1,), cls=_OtherTestPMDVariable
+            )
+        },
+        pmd_values={"pmd:beta_x": np.array([2.0])},
+    )
+
+    with pytest.warns(UserWarning, match="same PMDVariable subclass"):
         model = StagedModel([beam_source, beam_transport])
 
     assert "pmd:beta_x" not in model.supported_variables
@@ -403,11 +443,11 @@ def test_staged_model_pmd_variable_wrong_type_excluded_with_warning() -> None:
 
 def test_staged_model_pmd_variable_shape_mismatch_excluded_with_warning() -> None:
     beam_source = BeamSourceTestModel(
-        pmd_variables={"pmd:orbit": _pmd_ndvariable("pmd:orbit", (2,))},
+        pmd_variables={"pmd:orbit": _pmd_variable("pmd:orbit", (2,))},
         pmd_values={"pmd:orbit": np.array([1.0, 2.0])},
     )
     beam_transport = BeamTransportTestModel(
-        pmd_variables={"pmd:orbit": _pmd_ndvariable("pmd:orbit", (3, 2))},
+        pmd_variables={"pmd:orbit": _pmd_variable("pmd:orbit", (3, 2))},
         pmd_values={"pmd:orbit": np.zeros((3, 2))},
     )
 
@@ -421,11 +461,11 @@ def test_staged_model_pmd_variable_set_raises_read_only() -> None:
     from lume.exceptions import ReadOnlyError
 
     beam_source = BeamSourceTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([1.0])},
     )
     beam_transport = BeamTransportTestModel(
-        pmd_variables={"pmd:beta_x": _pmd_ndvariable("pmd:beta_x", (1,))},
+        pmd_variables={"pmd:beta_x": _pmd_variable("pmd:beta_x", (1,))},
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
     model = StagedModel([beam_source, beam_transport])

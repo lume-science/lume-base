@@ -7,6 +7,7 @@ from beamphysics import ParticleGroup
 
 from lume.model import LUMEModel
 from lume.variables.ndvariable import NDVariable
+from lume.variables.pmd import PMDVariable
 from lume.variables.variable import Variable
 
 
@@ -115,11 +116,13 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     @staticmethod
     def _combined_pmd_variables(models: list[LUMEModel]) -> dict[str, NDVariable]:
         """
-        Build read-only NDVariables representing pmd: outputs, concatenated
-        along axis 0 across all models that support a given name. A pmd: name
-        that isn't supported by every model as a compatible NDVariable is
-        excluded from the result and a warning is issued (once per unique
-        message, per the default warnings filter) rather than raising.
+        Build read-only PMDVariables representing pmd: outputs, concatenated
+        along axis 0 across all models that support a given name. Each combined
+        variable is an instance of the same PMDVariable subclass shared by all
+        staged models for that name. A pmd: name that isn't supported by every
+        model as a compatible PMDVariable is excluded from the result and a
+        warning is issued (once per unique message, per the default warnings
+        filter) rather than raising.
 
         Parameters
         ----------
@@ -144,10 +147,20 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
             stage_vars = [model.supported_variables[name] for model in models]
 
-            if not all(isinstance(var, NDVariable) for var in stage_vars):
+            if not all(isinstance(var, PMDVariable) for var in stage_vars):
                 warnings.warn(
-                    f"pmd: variable '{name}' must be an NDVariable on every "
+                    f"pmd: variable '{name}' must be a PMDVariable on every "
                     "model; excluding it from supported_variables.",
+                    stacklevel=2,
+                )
+                continue
+
+            first_type = type(stage_vars[0])
+            if not all(type(var) is first_type for var in stage_vars[1:]):
+                warnings.warn(
+                    f"pmd: variable '{name}' must use the same PMDVariable "
+                    "subclass on every model; excluding it from "
+                    "supported_variables.",
                     stacklevel=2,
                 )
                 continue
@@ -162,8 +175,11 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 continue
 
             combined_shape = (sum(var.shape[0] for var in stage_vars), *tail_shape)
-            combined[name] = NDVariable(
-                name=name, shape=combined_shape, dtype=np.float64, read_only=True
+            combined[name] = first_type(
+                name=name,
+                shape=combined_shape,
+                unit=stage_vars[0].unit,
+                read_only=True,
             )
 
         return combined
@@ -190,7 +206,8 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 arrays = [
                     model.get([name])[name] for model in self.lume_model_instances
                 ]
-                values[name] = np.concatenate(arrays, axis=0).astype(np.float64)
+                dtype = self.supported_variables[name].dtype
+                values[name] = np.concatenate(arrays, axis=0).astype(dtype)
 
         for model in self.lume_model_instances:
             model_names = [
