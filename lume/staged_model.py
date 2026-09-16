@@ -35,6 +35,20 @@ class FinalParticlesMixIn(ABC):
     def final_particles(self) -> ParticleGroup: ...
 
 
+def _canonical_pmd_class(var: PMDVariable) -> type[PMDVariable]:
+    """Return the `create_pmd_variable`-generated ancestor class for `var`.
+
+    This is the class in `var`'s MRO whose direct base is `PMDVariable` itself
+    (e.g. `PMDbeta_x`), used to compare pmd: variables across different
+    simulator-specific subclasses (e.g. `ImpactPMDbeta_x` vs `DistgenPMDbeta_x`)
+    that share the same canonical name/unit/dtype contract.
+    """
+    for klass in type(var).__mro__:
+        if klass.__bases__ == (PMDVariable,):
+            return klass
+    return type(var)
+
+
 class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     """
     Composes multiple LUMEModel instances in sequence, passing final particles
@@ -117,9 +131,11 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     def _combined_pmd_variables(models: list[LUMEModel]) -> dict[str, NDVariable]:
         """
         Build read-only PMDVariables representing pmd: outputs, concatenated
-        along axis 0 across all models that support a given name. Each combined
-        variable is an instance of the same PMDVariable subclass shared by all
-        staged models for that name. A pmd: name that isn't supported by every
+        along axis 0 across all models that support a given name. Each staged
+        model may use a different simulator-specific PMDVariable subclass for
+        a given name (e.g. `ImpactPMDbeta_x` vs `DistgenPMDbeta_x`), as long as
+        they share the same canonical `create_pmd_variable`-generated ancestor
+        (see `_canonical_pmd_class`). A pmd: name that isn't supported by every
         model as a compatible PMDVariable is excluded from the result and a
         warning is issued (once per unique message, per the default warnings
         filter) rather than raising.
@@ -155,11 +171,14 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 )
                 continue
 
-            first_type = type(stage_vars[0])
-            if not all(type(var) is first_type for var in stage_vars[1:]):
+            first_type = _canonical_pmd_class(stage_vars[0])
+            if not all(
+                _canonical_pmd_class(var) is first_type for var in stage_vars[1:]
+            ):
                 warnings.warn(
-                    f"pmd: variable '{name}' must use the same PMDVariable "
-                    "subclass on every model; excluding it from "
+                    f"pmd: variable '{name}' must use the same canonical "
+                    "PMDVariable class (i.e. share the same pmd: name/unit "
+                    "contract) on every model; excluding it from "
                     "supported_variables.",
                     stacklevel=2,
                 )

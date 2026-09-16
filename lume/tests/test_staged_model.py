@@ -11,7 +11,7 @@ except ImportError:
 from lume.model import LUMEModel
 from lume.staged_model import FinalParticlesMixIn, InitialParticlesMixIn, StagedModel
 from lume.variables import ScalarVariable, Variable
-from lume.variables.pmd import PMDVariable
+from lume.variables.pmd import PMDVariable, PMDbeta_x
 
 
 def make_test_particle_group(
@@ -433,10 +433,41 @@ def test_staged_model_pmd_variable_different_subclass_excluded_with_warning() ->
         pmd_values={"pmd:beta_x": np.array([2.0])},
     )
 
-    with pytest.warns(UserWarning, match="same PMDVariable subclass"):
+    with pytest.warns(UserWarning, match="same canonical PMDVariable class"):
         model = StagedModel([beam_source, beam_transport])
 
     assert "pmd:beta_x" not in model.supported_variables
+
+
+class _ImpactLikePMDbeta_x(PMDbeta_x):
+    """Simulates one simulator-specific concrete subclass of the canonical PMDbeta_x."""
+
+    def _get(self, simulator: Any) -> Any:
+        raise NotImplementedError
+
+
+class _DistgenLikePMDbeta_x(PMDbeta_x):
+    """Simulates a second, distinct simulator-specific concrete subclass of PMDbeta_x."""
+
+    def _get(self, simulator: Any) -> Any:
+        raise NotImplementedError
+
+
+def test_staged_model_pmd_variable_same_canonical_class_combines() -> None:
+    """Different concrete subclasses of the same canonical PMDVariable combine."""
+    beam_source = BeamSourceTestModel(
+        pmd_variables={"pmd:beta_x": _ImpactLikePMDbeta_x(shape=(1,), read_only=True)},
+        pmd_values={"pmd:beta_x": np.array([1.0], dtype=np.float32)},
+    )
+    beam_transport = BeamTransportTestModel(
+        pmd_variables={"pmd:beta_x": _DistgenLikePMDbeta_x(shape=(1,), read_only=True)},
+        pmd_values={"pmd:beta_x": np.array([2.0], dtype=np.float32)},
+    )
+    model = StagedModel([beam_source, beam_transport])
+
+    assert "pmd:beta_x" in model.supported_variables
+    values = model.get(["pmd:beta_x"])["pmd:beta_x"]
+    assert np.allclose(values, [1.0, 2.0])
 
 
 def test_staged_model_pmd_variable_set_raises_read_only() -> None:
