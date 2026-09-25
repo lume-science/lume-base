@@ -20,7 +20,7 @@ class LUMEModel(ABC):
 
     Methods
     -------
-    get(names: list[str] | str) -> dict[str, Any] | Any:
+    get(names: list[str]) -> dict[str, Any] | Any:
         Get measurements/state from the simulator.
 
     set(values: dict[str, Any]) -> None:
