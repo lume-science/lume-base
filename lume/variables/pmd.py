@@ -14,12 +14,7 @@ class PMDVariable(NDVariable, ReadOnlyActionMixin):
 
     # pmd: data is stored/transmitted as float32 by OpenPMD Beamphysics convention
     dtype: np.dtype = np.dtype(np.float32)
-
-    @field_validator("name")
-    def validate_name(cls, value):
-        if not value.startswith("pmd:"):
-            raise ValueError("Name must start with 'pmd:'")
-        return value
+    read_only: bool = True
 
     @field_validator("shape")
     def validate_shape(cls, value):
@@ -29,132 +24,108 @@ class PMDVariable(NDVariable, ReadOnlyActionMixin):
         return value
 
 
-def create_pmd_variable(
-    class_name: str, name: str, unit: str, description: str
-) -> type[PMDVariable]:
-    """Create a `PMDVariable` subclass with a fixed name and unit.
+class PMDbeta_x(PMDVariable):
+    """Read-only variable for the horizontal beta function in OpenPMD Beamphysics units."""
 
-    The ``name``, ``unit``, and ``read_only`` fields are constrained with
-    `Literal` annotations so instances cannot be constructed with different
-    values.
-
-    Parameters
-    ----------
-    class_name : str
-        Name of the generated class.
-    name : str
-        Fixed value of the ``name`` field (must start with ``"pmd:"``).
-    unit : str
-        Fixed value of the ``unit`` field.
-    description : str
-        Docstring describing the variable.
-    """
-    return type(
-        class_name,
-        (PMDVariable,),
-        {
-            "__annotations__": {
-                "name": Literal[name],
-                "unit": Literal[unit],
-                "read_only": Literal[True],
-            },
-            "name": name,
-            "unit": unit,
-            "read_only": True,
-            "__doc__": description,
-        },
-    )
+    name: str = "pmd:beta_x"  # default name
+    unit: Literal["m"] = "m"
 
 
-PMDbeta_x = create_pmd_variable(
-    "PMDbeta_x",
-    "pmd:beta_x",
-    "m",
-    "Read-only variable for the horizontal beta function in OpenPMD Beamphysics units.",
-)
+class PMDbeta_y(PMDVariable):
+    """Read-only variable for the vertical beta function in OpenPMD Beamphysics units."""
 
-PMDbeta_y = create_pmd_variable(
-    "PMDbeta_y",
-    "pmd:beta_y",
-    "m",
-    "Read-only variable for the vertical beta function in OpenPMD Beamphysics units.",
-)
+    name: str = "pmd:beta_y"  # default name
+    unit: Literal["m"] = "m"
 
-PMDalpha_x = create_pmd_variable(
-    "PMDalpha_x",
-    "pmd:alpha_x",
-    "",
-    "Read-only variable for the horizontal alpha function in OpenPMD Beamphysics units.",
-)
 
-PMDalpha_y = create_pmd_variable(
-    "PMDalpha_y",
-    "pmd:alpha_y",
-    "",
-    "Read-only variable for the vertical alpha function in OpenPMD Beamphysics units.",
-)
+class PMDalpha_x(PMDVariable):
+    """Read-only variable for the horizontal alpha function in OpenPMD Beamphysics units."""
 
-PMDnorm_emit_x = create_pmd_variable(
-    "PMDnorm_emit_x",
-    "pmd:norm_emit_x",
-    "m",
-    "Read-only variable for the horizontal normalized emittance in OpenPMD Beamphysics units.",
-)
+    name: str = "pmd:alpha_x"  # default name
+    unit: Literal[""] = ""
 
-PMDnorm_emit_y = create_pmd_variable(
-    "PMDnorm_emit_y",
-    "pmd:norm_emit_y",
-    "m",
-    "Read-only variable for the vertical normalized emittance in OpenPMD Beamphysics units.",
-)
 
-PMDsigma_x = create_pmd_variable(
-    "PMDsigma_x",
-    "pmd:sigma_x",
-    "m",
-    "Read-only variable for the horizontal beam size in OpenPMD Beamphysics units.",
-)
+class PMDalpha_y(PMDVariable):
+    """Read-only variable for the vertical alpha function in OpenPMD Beamphysics units."""
 
-PMDsigma_y = create_pmd_variable(
-    "PMDsigma_y",
-    "pmd:sigma_y",
-    "m",
-    "Read-only variable for the vertical beam size in OpenPMD Beamphysics units.",
-)
+    name: str = "pmd:alpha_y"  # default name
+    unit: Literal[""] = ""
 
-PMDsigma_z = create_pmd_variable(
-    "PMDsigma_z",
-    "pmd:sigma_z",
-    "m",
-    "Read-only variable for the longitudinal beam size in OpenPMD Beamphysics units.",
-)
 
-PMDkinetic_energy = create_pmd_variable(
-    "PMDkinetic_energy",
-    "pmd:kinetic_energy",
-    "eV",
-    "Read-only variable for the kinetic energy in OpenPMD Beamphysics units.",
-)
+class PMDgamma_x(PMDVariable):
+    """Read-only variable for the horizontal gamma function in OpenPMD Beamphysics units."""
 
-PMDp = create_pmd_variable(
-    "PMDp",
-    "pmd:p",
-    "eV/c",
-    "Read-only variable for the momentum in OpenPMD Beamphysics units.",
-)
+    name: str = "pmd:gamma_x"  # default name
+    unit: Literal[""] = ""
 
-PMDs = create_pmd_variable(
-    "PMDs",
-    "pmd:s",
-    "m",
-    "Read-only variable for the longitudinal beam position s.",
-)
+
+class PMDgamma_y(PMDVariable):
+    """Read-only variable for the vertical gamma function in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:gamma_y"  # default name
+    unit: Literal[""] = ""
+
+
+class PMDnorm_emit_x(PMDVariable):
+    """Read-only variable for the horizontal normalized emittance in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:norm_emit_x"  # default name
+    unit: Literal["m"] = "m"
+
+
+class PMDnorm_emit_y(PMDVariable):
+    """Read-only variable for the vertical normalized emittance in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:norm_emit_y"  # default name
+    unit: Literal["m"] = "m"
+
+
+class PMDsigma_x(PMDVariable):
+    """Read-only variable for the horizontal beam size in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:sigma_x"  # default name
+    unit: Literal["m"] = "m"
+
+
+class PMDsigma_y(PMDVariable):
+    """Read-only variable for the vertical beam size in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:sigma_y"  # default name
+    unit: Literal["m"] = "m"
+
+
+class PMDsigma_z(PMDVariable):
+    """Read-only variable for the longitudinal beam size in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:sigma_z"  # default name
+    unit: Literal["m"] = "m"
+
+
+class PMDkinetic_energy(PMDVariable):
+    """Read-only variable for the kinetic energy in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:kinetic_energy"  # default name
+    unit: Literal["eV"] = "eV"
+
+
+class PMDp(PMDVariable):
+    """Read-only variable for the momentum in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:p"  # default name
+    unit: Literal["eV/c"] = "eV/c"
+
+
+class PMDs(PMDVariable):
+    """Read-only variable for the longitudinal beam position s in OpenPMD Beamphysics units."""
+
+    name: str = "pmd:s"  # default name
+    unit: Literal["m"] = "m"
 
 
 class PMDmodel_index(PMDVariable):
     """Identifies, for each entry of a combined pmd: array, which staged model produced it."""
 
-    name: Literal["pmd:model_index"] = "pmd:model_index"
+    name: str = "pmd:model_index"
     unit: Literal[""] = ""
     read_only: Literal[True] = True
     dtype: np.dtype = np.dtype(np.int64)
