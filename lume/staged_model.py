@@ -180,7 +180,7 @@ def _build_pmd_metadata(
     """Build staged PMD variables and model-specific lookup keys.
 
     Only canonical PMD classes present in every stage are combined.
-    Ordinary variables are not returned, but their names are checked 
+    Ordinary variables are not returned, but their names are checked
     for collisions with the combined PMD names.
 
     Parameters
