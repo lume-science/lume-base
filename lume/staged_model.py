@@ -418,6 +418,19 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
             PMDmodel_index. Overrides replace default names, not add aliases,
             and never rename submodel variables. Unspecified classes use their
             default names; overrides do not enable unsupported outputs.
+
+        Examples
+        --------
+        Given compatible ``source`` and ``transport`` models that both expose
+        concrete PMDbeta_x variables:
+
+        >>> from lume.staged_model import StagedModel
+        >>> from lume.variables.pmd import PMDbeta_x, PMDmodel_index
+        >>> staged = StagedModel(
+        ...     [source, transport],
+        ...     pmd_variable_names={PMDbeta_x: "beta", PMDmodel_index: "stage"},
+        ... )
+        >>> values = staged.get(["beta", "stage"])
         """
         super().__init__()
 
