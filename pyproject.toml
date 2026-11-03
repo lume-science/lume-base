@@ -7,7 +7,7 @@ name = "lume-base"
 dynamic = ["version"]
 description = "Base classes and architecture for LUME Python projects"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "SLAC National Accelerator Laboratory" }]
