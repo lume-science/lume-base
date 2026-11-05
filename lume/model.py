@@ -190,6 +190,37 @@ class LUMEModel(ABC):
         """
         raise NotImplementedError("reset method must be implemented by subclasses.")
 
+    def archive(self, filename: str) -> None:
+        """
+        Archive the current state of the model object to h5 file.
+
+        The h5 file should contain information necessary to reconstruct the model's state.
+
+        Parameters
+        ----------
+        filename: str
+            The name of the h5 file to which the model state should be archived.
+        """
+        raise NotImplementedError("archive method must be implemented by subclasses.")
+
+    @classmethod
+    def from_archive(cls, filename: str) -> "LUMEModel":
+        """
+        Create a model instance from an archived h5 file.
+
+        Parameters
+        ----------
+        filename: str
+            The name of the h5 file containing the archived model state.
+
+        Returns
+        -------
+        Model
+            An instance of the model reconstructed from the archived state.
+        """
+        raise NotImplementedError("from_archive method must be implemented by subclasses.")
+
+
     @property
     @abstractmethod
     def supported_variables(self) -> dict[str, Variable]:
