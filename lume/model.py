@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any
+
+import h5py
 
 from lume.variables import Variable
 from lume.exceptions import ReadOnlyError
@@ -190,6 +193,17 @@ class LUMEModel(ABC):
         """
         raise NotImplementedError("reset method must be implemented by subclasses.")
 
+    def dump(self) -> dict[str, Any]:
+        """
+        Dump the current state of the model as a dictionary such that it can be archived and later reconstructed using from_archive.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary containing the current state of the model.
+        """
+        raise NotImplementedError("dump method must be implemented by subclasses.")
+
     def archive(self, filename: str) -> None:
         """
         Archive the current state of the model object to h5 file.
@@ -201,7 +215,27 @@ class LUMEModel(ABC):
         filename: str
             The name of the h5 file to which the model state should be archived.
         """
-        raise NotImplementedError("archive method must be implemented by subclasses.")
+        # recursively dump the model state into the h5 file
+        with h5py.File(filename, "w") as f:
+            for key, value in self.dump().items():
+                f.attrs[key] = value
+
+    @classmethod
+    def from_dump(cls, dump: dict[str, Any]) -> "LUMEModel":
+        """
+        Create a model instance from a dumped state dictionary.
+
+        Parameters
+        ----------
+        dump: dict[str, Any]
+            The dictionary containing the dumped model state.
+
+        Returns
+        -------
+        LUMEModel
+            An instance of the model reconstructed from the dumped state.
+        """
+        raise NotImplementedError("from_dump method must be implemented by subclasses.")
 
     @classmethod
     def from_archive(cls, filename: str) -> "LUMEModel":
@@ -215,10 +249,12 @@ class LUMEModel(ABC):
 
         Returns
         -------
-        Model
+        LUMEModel
             An instance of the model reconstructed from the archived state.
         """
-        raise NotImplementedError("from_archive method must be implemented by subclasses.")
+        with h5py.File(filename, "r") as f:
+            dump = {key: f.attrs[key] for key in f.attrs}
+        return cls.from_dump(dump)
 
     def clone(self) -> "LUMEModel":
         """
@@ -229,7 +265,7 @@ class LUMEModel(ABC):
         LUMEModel
             A new instance of the model with the same state as the current instance.
         """
-        raise NotImplementedError("clone method must be implemented by subclasses.")
+        return self.from_dump(deepcopy(self.dump()))
 
     @property
     @abstractmethod
