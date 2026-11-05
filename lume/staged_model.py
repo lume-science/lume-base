@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from beamphysics import ParticleGroup
+import h5py
 
 from lume.model import LUMEModel
 from lume.variables.variable import Variable
@@ -176,3 +177,65 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         for model in self.lume_model_instances:
             model.reset()
         self._is_init = False
+
+
+    def clone(self) -> "StagedModel":
+        """
+        Create a deep copy of the current staged model instance.
+
+        Returns
+        -------
+        StagedModel
+            A new instance of the staged model with the same state as the current instance.
+        """
+        instance_clones = []
+        for model in self.lume_model_instances:
+            instance_clones.append(model.clone())
+
+        cloned_staged_model = StagedModel(instance_clones)
+        return cloned_staged_model
+
+
+    def dump(self) -> dict[str, Any]:
+        """
+        Dump the current state of the staged model into a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary containing the dumped state of the staged model.
+        """
+        model_info = {}
+        for i, model in enumerate(self.lume_model_instances):
+            model_info[f"model_{i}"] = model.dump() | {"model_class": model.__class__.__name__}
+        return model_info
+
+    def archive(self, filename: str) -> None:
+        """
+        Archive the current state of the staged model into an HDF5 file.
+
+        Parameters
+        ----------
+        filename: str
+            The path to the HDF5 file where the staged model state will be archived.
+
+        Returns
+        -------
+        None
+        """
+        with h5py.File(filename, "w") as f:
+            for i, model in enumerate(self.lume_model_instances):
+                model_group = f.create_group(f"model_{i}")
+                for key, value in model.dump().items():
+                    model_group.attrs[key] = value
+
+    @classmethod
+    def from_dump(cls, dump: dict[str, Any]) -> "LUMEModel":
+        model_instances = []
+        for i in range(len(dump.keys())):
+            model_class = dump[f"model_{i}"]["model_class"]
+            model_dump = {key: value for key, value in dump[f"model_{i}"].items() if key != "model_class"}
+            model_class = globals()[model_class]
+            model_instance = model_class.from_dump(model_dump)
+            model_instances.append(model_instance)
+        return cls(model_instances)
