@@ -220,6 +220,16 @@ class LUMEModel(ABC):
         """
         raise NotImplementedError("from_archive method must be implemented by subclasses.")
 
+    def clone(self) -> "LUMEModel":
+        """
+        Create a deep copy of the current model instance.
+
+        Returns
+        -------
+        LUMEModel
+            A new instance of the model with the same state as the current instance.
+        """
+        raise NotImplementedError("clone method must be implemented by subclasses.")
 
     @property
     @abstractmethod
