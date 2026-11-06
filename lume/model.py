@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
+
+import h5py
 
 from lume.variables import Variable
 from lume.exceptions import ReadOnlyError
@@ -189,6 +192,40 @@ class LUMEModel(ABC):
         Reset the simulator to its initial state.
         """
         raise NotImplementedError("reset method must be implemented by subclasses.")
+
+    def to_archive(self, location: str | Path | h5py.Group) -> None:
+        """
+        Archive the current state of the model object to h5 file or h5py.Group object.
+
+        The archive should contain information necessary to reconstruct the model's state using the from_archive method.
+
+        Parameters
+        ----------
+        location: str | Path | h5py.Group
+            The location of the h5 file or h5py.Group object to which the model state should be archived.
+        """
+        raise NotImplementedError(
+            "to_archive method must be implemented by subclasses."
+        )
+
+    @classmethod
+    def from_archive(cls, location: str | Path | h5py.Group) -> "LUMEModel":
+        """
+        Create a model instance from an archived h5 file.
+
+        Parameters
+        ----------
+        location: str | Path | h5py.Group
+            The location of the h5 file or h5py.Group object containing the archived model state.
+
+        Returns
+        -------
+        LUMEModel
+            An instance of the model reconstructed from the archived state.
+        """
+        raise NotImplementedError(
+            "from_archive method must be implemented by subclasses."
+        )
 
     @property
     @abstractmethod

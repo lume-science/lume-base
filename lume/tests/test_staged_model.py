@@ -1,5 +1,8 @@
+from pathlib import Path
 from typing import Any
+import json
 
+import h5py
 import numpy as np
 import pytest
 
@@ -130,6 +133,169 @@ class BeamTransportTestModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMix
 
     def reset(self) -> None:
         self._state = self._initial_state.copy()
+
+
+class ArchivedBeamModel(BeamSourceTestModel):
+    def __init__(self, name: str, value: float):
+        super().__init__()
+        self._variables = {name: ScalarVariable(name=name, default_value=value)}
+        self._state = {name: value}
+        self._initial_state = self._state.copy()
+
+    def _set(self, values: dict[str, Any]) -> None:
+        self._state.update(values)
+        self._final_particles = self._initial_particles
+
+    def to_archive(self, location: str | Path | h5py.Group) -> None:
+        if isinstance(location, (str, Path)):
+            with h5py.File(location, "w") as group:
+                self.to_archive(group)
+            return
+        name, value = next(iter(self._state.items()))
+        # Store the state value
+        location.attrs["value"] = value
+        # Serialize the complete ScalarVariable to JSON
+        variable = self._variables[name]
+        variable_json = json.dumps(variable.model_dump())
+        location.attrs["variable_json"] = variable_json
+
+    @classmethod
+    def from_archive(cls, location: str | Path | h5py.Group) -> "ArchivedBeamModel":
+        if isinstance(location, (str, Path)):
+            with h5py.File(location, "r") as group:
+                return cls.from_archive(group)
+
+        # Deserialize the ScalarVariable from JSON
+        variable_json = location.attrs["variable_json"]
+        variable_dict = json.loads(variable_json)
+        # Remove the variable_class key as it's not needed for construction
+        variable_dict.pop("variable_class", None)
+        # Recreate the variable
+        variable = ScalarVariable(**variable_dict)
+
+        # Create an instance and set up its variables properly
+        instance = cls.__new__(cls)
+        BeamSourceTestModel.__init__(instance)
+        instance._variables = {variable.name: variable}
+        instance._state = {variable.name: float(location.attrs["value"])}
+        instance._initial_state = instance._state.copy()
+        beam = make_test_particle_group(x_offset=0.0)
+        instance._initial_particles = beam
+        instance._final_particles = beam
+        return instance
+
+
+@pytest.fixture
+def archive_model() -> StagedModel:
+    return StagedModel([ArchivedBeamModel(f"stage_{i}", float(i)) for i in range(12)])
+
+
+@pytest.mark.parametrize("location_type", ["path", "str", "file", "group"])
+def test_staged_archive_round_trip(tmp_path, archive_model, location_type):
+    registry = {"ArchivedBeamModel": ArchivedBeamModel}
+    path = tmp_path / "stages.h5"
+    if location_type in ("path", "str"):
+        location = path if location_type == "path" else str(path)
+        archive_model.to_archive(location)
+        restored = StagedModel.from_archive(location, registry)
+    else:
+        with h5py.File(path, "w") as file:
+            location = file if location_type == "file" else file.create_group("stages")
+            archive_model.to_archive(location)
+            restored = StagedModel.from_archive(location, registry)
+            assert file.id.valid
+
+    names = [f"stage_{i}" for i in range(12)]
+    assert list(restored.supported_variables) == names
+    assert restored.get(names) == dict(zip(names, map(float, range(12))))
+    assert all(
+        type(model) is ArchivedBeamModel for model in restored.lume_model_instances
+    )
+
+
+@pytest.mark.parametrize("location_type", ["path", "str", "paths", "strings"])
+def test_staged_archive_files_preserve_repeated_classes(
+    tmp_path, archive_model, location_type
+):
+    if location_type in ("path", "str"):
+        location = tmp_path / "stages"
+        expected_paths = [location / f"model_{i}.h5" for i in range(12)]
+        if location_type == "str":
+            location = str(location)
+    else:
+        expected_paths = [tmp_path / f"custom_{i}.h5" for i in range(12)]
+        location = (
+            expected_paths
+            if location_type == "paths"
+            else [str(path) for path in expected_paths]
+        )
+    records = archive_model.to_archive_files(location)
+    assert records == [("ArchivedBeamModel", path) for path in expected_paths]
+    assert all(path.is_file() for _, path in records)
+
+    input_records = (
+        [(name, str(path)) for name, path in records]
+        if location_type == "strings"
+        else records
+    )
+    restored = StagedModel.from_archive_paths(
+        input_records, {"ArchivedBeamModel": ArchivedBeamModel}
+    )
+    names = [f"stage_{i}" for i in range(12)]
+    assert list(restored.supported_variables) == names
+    assert restored.get(names) == dict(zip(names, map(float, range(12))))
+
+
+@pytest.mark.parametrize("separate", [False, True])
+@pytest.mark.parametrize("registry", [None, {}])
+def test_staged_archive_requires_registered_class(
+    tmp_path, archive_model, separate, registry
+):
+    with pytest.raises(
+        ValueError, match="Model class 'ArchivedBeamModel' is not registered"
+    ):
+        if separate:
+            records = archive_model.to_archive_files(tmp_path)
+            StagedModel.from_archive_paths(records, registry)
+        else:
+            path = tmp_path / "stages.h5"
+            archive_model.to_archive(path)
+            StagedModel.from_archive(path, registry)
+
+
+@pytest.mark.parametrize("separate", [False, True])
+def test_staged_archive_nested_round_trip(tmp_path, archive_model, separate):
+    model = StagedModel([archive_model])
+    registry = {"StagedModel": StagedModel, "ArchivedBeamModel": ArchivedBeamModel}
+    if separate:
+        restored = StagedModel.from_archive_paths(
+            model.to_archive_files(tmp_path), registry
+        )
+    else:
+        path = tmp_path / "nested.h5"
+        model.to_archive(path)
+        restored = StagedModel.from_archive(path, registry)
+    assert isinstance(restored.lume_model_instances[0], StagedModel)
+    assert len(restored.lume_model_instances[0].lume_model_instances) == 12
+    names = list(model.supported_variables)
+    assert restored.get(names) == model.get(names)
+
+
+@pytest.mark.parametrize("method", ["to_archive", "from_archive", "to_archive_files"])
+def test_staged_archive_rejects_invalid_location(archive_model, method):
+    with pytest.raises(TypeError, match="location must be"):
+        getattr(archive_model, method)(123)
+
+
+def test_staged_archive_files_validate_paths_before_writing(tmp_path, archive_model):
+    path = tmp_path / "model.h5"
+    with pytest.raises(ValueError, match="length"):
+        archive_model.to_archive_files([path])
+    with pytest.raises(TypeError, match="Each archive path"):
+        archive_model.to_archive_files([path] * 11 + [123])
+    with pytest.raises(ValueError, match="unique"):
+        archive_model.to_archive_files([path] * 12)
+    assert not path.exists()
 
 
 def test_staged_model_init() -> None:
@@ -326,3 +492,40 @@ def test_staged_model_raises_when_last_model_lacks_final_particles() -> None:
         match="Cannot access final_particles because the last model does not implement FinalParticlesMixIn",
     ):
         _ = model.final_particles
+
+
+def test_archived_beam_model_preserves_scalar_variable_type(tmp_path):
+    """Test that ArchivedBeamModel preserves complete ScalarVariable information during archive/restore."""
+
+    # Create a model with a ScalarVariable that has non-default properties
+    model = ArchivedBeamModel("dummy", 1.0)
+    var = ScalarVariable(
+        name="beam_energy",
+        default_value=100.0,
+        value_range=(50.0, 500.0),
+        unit="MeV",
+        description="Beam energy setting",
+        read_only=False,
+    )
+    model._variables = {"beam_energy": var}
+    model._state = {"beam_energy": 100.0}
+    model._initial_state = model._state.copy()
+
+    # Archive the model
+    archive_path = tmp_path / "model.h5"
+    model.to_archive(str(archive_path))
+
+    # Restore from archive
+    restored = ArchivedBeamModel.from_archive(str(archive_path))
+    restored_var = restored.supported_variables["beam_energy"]
+
+    # Verify all properties are preserved
+    assert restored_var.name == var.name
+    assert restored_var.value_range == var.value_range
+    assert restored_var.unit == var.unit
+    assert restored_var.description == var.description
+    assert restored_var.read_only == var.read_only
+    assert restored_var.default_value == var.default_value
+
+    # Verify state is also preserved
+    assert restored.get(["beam_energy"]) == {"beam_energy": 100.0}
