@@ -7,7 +7,6 @@ from lume.variables import Variable, ScalarVariable, ConfigEnum
 from lume.exceptions import ReadOnlyError
 
 
-
 # Mock Variable subclass for testing
 class MockVariable(Variable):
     """Mock Variable implementation for testing purposes."""
@@ -306,6 +305,7 @@ class TestLUMEModel:
         with pytest.raises(ValueError, match="is not a valid Variable instance"):
             # This should fail because strings don't have read_only or validate_value attributes
             model.set({"invalid_var": "some_value"})
+
 
 class TestVariableModelDump:
     """Test that model_dump properly serializes ConfigEnum values."""
