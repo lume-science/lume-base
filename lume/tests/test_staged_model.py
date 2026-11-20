@@ -298,6 +298,45 @@ def test_staged_archive_files_validate_paths_before_writing(tmp_path, archive_mo
     assert not path.exists()
 
 
+@pytest.mark.parametrize("location_type", [str, Path])
+@pytest.mark.parametrize(
+    ("invalid_destination", "error"),
+    [
+        ("directory", IsADirectoryError),
+        ("missing_parent", FileNotFoundError),
+        ("file_parent", NotADirectoryError),
+    ],
+)
+def test_staged_archive_files_reject_invalid_destinations_before_writing(
+    tmp_path, archive_model, location_type, invalid_destination, error
+):
+    paths = [tmp_path / f"model_{i}.h5" for i in range(12)]
+    paths[0].write_text("existing archive")
+    if invalid_destination == "directory":
+        paths[-1].mkdir()
+    elif invalid_destination == "missing_parent":
+        paths[-1] = tmp_path / "missing" / "model.h5"
+    else:
+        paths[-1] = paths[0] / "model.h5"
+
+    with pytest.raises(error):
+        archive_model.to_archive_files([location_type(path) for path in paths])
+
+    assert paths[0].read_text() == "existing archive"
+    assert not any(path.exists() for path in paths[1:-1])
+
+
+def test_staged_archive_files_reject_generated_directory_before_writing(
+    tmp_path, archive_model
+):
+    (tmp_path / "model_11.h5").mkdir()
+
+    with pytest.raises(IsADirectoryError):
+        archive_model.to_archive_files(tmp_path)
+
+    assert not (tmp_path / "model_0.h5").exists()
+
+
 def test_staged_model_init() -> None:
     beam_source = BeamSourceTestModel()
     beam_transport = BeamTransportTestModel()

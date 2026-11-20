@@ -213,12 +213,25 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         Parameters
         ----------
         location: str | Path | list[str | Path]
-            A directory path where individual model files will be saved, or a list of file paths for each model.
+            A directory path (created if needed) where files named model_{i}.h5
+            will be saved, or a list of explicit file paths for each model.
+            Explicit paths must have existing parent directories and must not
+            refer to directories. All destinations are checked before any model
+            is archived.
 
         Returns
         -------
         archive_paths: list[tuple[str, Path]]
             Ordered (class name, path) pairs, retaining repeated model classes.
+
+        Raises
+        ------
+        FileNotFoundError
+            An archive path's parent does not exist.
+        NotADirectoryError
+            An archive path's parent is not a directory.
+        IsADirectoryError
+            An archive file path refers to a directory.
         """
 
         if isinstance(location, (str, Path)):
@@ -241,6 +254,19 @@ class StagedModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         if len({path.resolve() for path in paths}) != len(paths):
             raise ValueError("Archive paths must be unique for each model.")
+        for path in paths:
+            if not path.parent.exists():
+                raise FileNotFoundError(
+                    f"Archive parent directory does not exist: {path.parent}"
+                )
+            if not path.parent.is_dir():
+                raise NotADirectoryError(
+                    f"Archive parent path is not a directory: {path.parent}"
+                )
+            if path.is_dir():
+                raise IsADirectoryError(
+                    f"Archive path must be a file, not a directory: {path}"
+                )
         archive_paths = []
         for model, path in zip(self.lume_model_instances, paths):
             model.to_archive(path)
